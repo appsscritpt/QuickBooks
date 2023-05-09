@@ -1,0 +1,197 @@
+
+//Production Credentials
+//libray id : 1B7FSrk5Zi6L1rSxxTDgDEUsPzlukDsi4KGuTMorsTQHhGBzBkMun4iDF
+var CLIENT_ID = ' CLIENT_ID'; // Get from Quickbooks Developer Console
+var CLIENT_SECRET = 'CLIENT_SECRET'; // Get from Quickbooks Developer Console
+var QB_COMPANY_ID = ' QB_COMPANY_ID'
+//general variables
+var BASE_AUTH_URL = 'https://appcenter.intuit.com/connect/oauth2';
+var TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
+var API_SCOPE = 'com.intuit.quickbooks.accounting';
+var REDIRECT_URI = ' REDIRECT_URI'; // Generate using the logRedirectUri() function mentioned at the end of this script
+var RESPONSE_TYPE = 'code';
+var custEmails = []
+var custIds = []
+
+function get_QBO(e) {
+  var service = getService();
+   var myHeaders = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer "  + service.getAccessToken() 
+  }
+  var requestOptions = {
+      method: 'GET',
+      headers: myHeaders,
+      redirect: 'follow'
+    }
+   
+  if (service.hasAccess()) {
+     getCustomersFromQuickBooks()
+     var attendees = e.calendar.attendees
+    let card = CardService.newCardBuilder()
+    //Logger.log(custEmails)
+    attendees.forEach(c=>{
+       var email = c.email.toString().toLowerCase()
+       if(custEmails.indexOf(email) > -1) {
+            var id = custIds[custEmails.indexOf(email)]
+            //Logger.log(id + ', ' + email)
+            var baseurl = 'https://quickbooks.api.intuit.com'
+            sql = "select * from Invoice where CustomerRef = '" + id + "'"
+            //Logger.log('sql: '+ sql)
+            var url = baseurl + '/v3/company/'+ QB_COMPANY_ID +'/query?query=' +  sql +'&minorversion=65'
+            var response = UrlFetchApp.fetch(url,requestOptions)
+              if (response.getResponseCode() == 200) {
+                  var result = JSON.parse(response.getContentText());
+                  var invoices = result.QueryResponse.Invoice;
+                  // Logger.log(email)
+                  // Logger.log(invoices)
+               if(invoices){
+                    for (var i = 0; i < invoices.length; i++) {
+                     
+                          var l = invoices[i]
+                          Logger.log(l.EInvoiceStatus)
+                          //if(l.EInvoiceStatus == 'Paid' || l.EInvoiceStatus == 'paid' ||l.EInvoiceStatus == 'PAID') {
+                          var container = buildInvoice(l)
+                          let paragraph = CardService.newTextParagraph().setText(container)
+                          let cardSection1 = CardService.newCardSection()
+                            .setHeader("Customer: " + email)
+                            .setCollapsible(true)
+                            .setNumUncollapsibleWidgets(0)
+                            .addWidget(paragraph)
+                            card.addSection(cardSection1)
+                      //}
+                    }
+              }
+               }
+       }
+    })
+    return card.build()
+    
+    // Get the Company ID to be used in the request.
+   
+  } else {
+    // If not authorized, get authorization URL.
+    var authorizationUrl = service.getAuthorizationUrl();
+    // View the Log to obtain the URL.
+    Logger.log('Open the following URL and re-run the script: %s',
+        authorizationUrl);
+  }
+}
+ function buildInvoice(l){
+ 
+  var txt = ''
+  txt +='invoice id: ' + l.Id + "\n"
+  txt += 'DueDate: ' + l.DueDate + "\n"
+  txt += 'Total Amount: ' + l.TotalAmt + "\n"
+  txt += 'BillEmail: ' + l.BillEmail.Address + "\n" 
+  txt += 'Balance: ' + l.Balance  + '\n'
+  txt += 'Items: ' + '\n'
+  txt +=  '===============================================' + '\n'
+  var items = l.Line
+  for (var i = 0; i<items.length-1;i++) {
+
+     txt+= items[i].Description + ' X ' + items[i].SalesItemLineDetail.Qty+' X ' + items[i].SalesItemLineDetail.UnitPrice +'\n'
+ }
+  return txt
+ }
+/**
+ * Configures the service.
+ */
+function getService() {
+  return OAuth2.createService('Quickbooks')
+      .setAuthorizationBaseUrl(BASE_AUTH_URL)
+      .setTokenUrl(TOKEN_URL)
+      .setClientId(CLIENT_ID)
+      .setClientSecret(CLIENT_SECRET)
+      .setScope(API_SCOPE)
+      .setCallbackFunction('authCallback')
+      .setParam('response_type', RESPONSE_TYPE)
+      .setParam('state', getStateToken('authCallback')) // function to generate the state token on the fly
+      .setPropertyStore(PropertiesService.getUserProperties());
+}
+
+/**
+ * Handles the OAuth callback
+ */
+function authCallback(request) {
+  var service = getService();
+  var authorized = service.handleCallback(request);
+  if (authorized) {
+    Logger.log("Success!");
+    return HtmlService.createHtmlOutput('Success!');
+  } else {
+    Logger.log("Denied!");
+    return HtmlService.createHtmlOutput('Denied.');
+  }
+}
+
+/** 
+ * Generate a State Token
+ */
+function getStateToken(callbackFunction){
+ var stateToken = ScriptApp.newStateToken()
+     .withMethod(callbackFunction)
+     .withTimeout(120)
+     .createToken();
+ return stateToken;
+}
+
+/**
+ * Logs the redirect URI. Run this function to get the REDIRECT_URI to be mentioned at the top of this script. 
+ */
+function logRedirectUri() {
+  Logger.log(getService().getRedirectUri());
+}
+/**
+ * Reset the authorization state, so that it can be re-tested.
+*/ 
+function reset() {
+  getService().reset();
+}
+
+var custEmails = []
+var custIds = []
+function getCustomersFromQuickBooks(email) {
+ 
+    var service = getService();
+
+    if (!service || !service.hasAccess()) {
+      Logger.log('Please authorize');
+      return;
+    }
+    var options = {
+       muteHttpExceptions: true,
+      headers: {
+        Authorization: 'Bearer ' + service.getAccessToken(),
+        'Accept' : 'application/json',
+        muteHttpExceptions: true
+      }
+    }
+    var baseurl = 'https://quickbooks.api.intuit.com'
+    var position = 1
+    for(var cnt= 1; cnt <12;cnt++){
+        var sql = "select * from Customer STARTPOSITION " + position + " maxresults 1000"
+        position += 1000
+        var url = baseurl + '/v3/company/'+ QB_COMPANY_ID +'/query?query=' + sql +'&minorversion=65'
+        var response = UrlFetchApp.fetch(url, options );
+        var result = JSON.parse(response.getContentText());
+        var customers = result.QueryResponse.Customer;
+        for (var i = 0; i < customers.length; i++) {
+          var l = customers[i]
+          // Logger.log(l)
+          // return
+          var check = JSON.stringify(l).includes("PrimaryEmailAddr")
+          if(check) {
+              custIds.push(l.Id)
+              custEmails.push(l.PrimaryEmailAddr.Address.toString().toLowerCase())
+          } 
+        }
+    }
+    // Logger.log(custIds)
+    //custEmails.sort()
+     //Logger.log(custIds[custEmails.indexOf("gerda.snyders@standardbank.co.za")])
+                      
+    // Logger.log(custEmails.length)
+    return
+}
