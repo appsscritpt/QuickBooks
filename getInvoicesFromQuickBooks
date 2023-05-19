@@ -1,0 +1,44 @@
+function getInvoicesFromQuickBooks() {
+  try {
+    var service = getService();
+
+    if (!service || !service.hasAccess()) {
+      Logger.log('Please authorize');
+      return;
+    }
+    var baseurl = 'https://quickbooks.api.intuit.com'
+    var sql = "select * from Invoice"
+    var url = baseurl + '/v3/company/'+ QB_COMPANY_ID +'/query?query=' + sql +'&minorversion=65'
+   
+    var response = UrlFetchApp.fetch(url, {
+       muteHttpExceptions: true,
+      
+      headers: {
+        Authorization: 'Bearer ' + service.getAccessToken(),
+        'Accept' : 'application/json',
+        muteHttpExceptions: true
+      }
+    });
+    var result = JSON.parse(response.getContentText());
+
+    var invoices = result.QueryResponse.Invoice;
+    var invoicesList =[]
+    for (var i = 0; i < invoices.length; i++) {
+      var Invoice = invoices[i];
+      var line = Invoice.Line
+      line.forEach(l=>{
+        if(l.DetailType == "SalesItemLineDetail") {
+           Logger.log('%s - %s Description: %s',l.Id,l.Amount,l.Description)
+           Logger.log('ItemRef.name: %s ',l.SalesItemLineDetail.ItemRef.name)
+            Logger.log('ItemRef.id: %s ',l.SalesItemLineDetail.ItemRef.id)
+           Logger.log('UnitPrice: %s ',l.SalesItemLineDetail.UnitPrice)
+      } else {
+        Logger.log('Invoice Total - %s',l.Amount)
+        Logger.log('==================================================')
+      }
+      })
+    }
+  } catch (f) {
+    Logger.log('INVOICES ERROR: ' + f.toString());
+  }
+}
