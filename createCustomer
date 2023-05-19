@@ -1,0 +1,41 @@
+function createCustomer(fname,lname,email) {
+
+    var service = getService();
+     var myHeaders = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": "Bearer "  + service.getAccessToken() 
+     }
+     var customer = {
+                  "FullyQualifiedName": fname + " " +lname, 
+                  "DisplayName": fname + " " +lname, 
+                  "GivenName": fname,
+                  "FamilyName": lname,
+                  "PrimaryEmailAddr": {
+                  "Address": email
+                  }       
+    }
+  var requestOptions = {
+      method: 'POST',
+      headers: myHeaders,
+      payload: JSON.stringify(customer),
+      redirect: 'follow'
+    }
+    if (!service || !service.hasAccess()) {
+      Logger.log('Please authorize');
+      return;
+    }
+
+
+    var baseurl = 'https://quickbooks.api.intuit.com'
+        var url = baseurl + '/v3/company/'+ QB_COMPANY_ID +'/customer?&minorversion=65'
+    try {
+    var response = UrlFetchApp.fetch(url, requestOptions);
+    var result = JSON.parse(response.getContentText());
+     var customer = result.Customer.Id
+     //Logger.log(customer.Id)
+    return customer
+    } catch(er) {
+      Logger.log(er.message)
+    }
+  }
