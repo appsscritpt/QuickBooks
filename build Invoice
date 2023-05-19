@@ -1,0 +1,112 @@
+function buildinvoice(doc) {
+    var items = doc.data.pricing.tables[0].items
+    var qboLines = []
+   
+    for (var i = 0; i < items.length; i++) {
+          ss.appendRow(['Item Name', items[i].merged_data.Name])
+         if(items[i].merged_data.Name == "Design Fee") {
+               var l = items[i].merged_data   
+                    var line = {
+                        "Amount" : l.Subtotal,
+                        "Description" : l.Name,
+                        "DetailType": "SalesItemLineDetail", 
+                        "SalesItemLineDetail": {
+                          "Qty": l.Qty, 
+                          "UnitPrice": l.Price,         
+                          "ItemRef": {
+                            "name": "Design Fee", 
+                            "value": "6"
+                          },
+                        
+                        },
+                        "LineNum": i + 1, 
+                    }  
+                    qboLines.push(line) 
+          }
+
+        if(items[i].merged_data.Name == "Rental Fee") {
+                var l = items[i].merged_data 
+               var monthly = {
+                      "Amount" :l.Subtotal,
+                      "Description": doc.data.tokens[10]["Rooms.Staged"], 
+                      "DetailType": "SalesItemLineDetail", 
+                      "SalesItemLineDetail": { 
+                        "Qty": l.Qty, 
+                        "UnitPrice": l.Price, 
+                        "ItemRef": {
+                          "name": "Monthly Inventory Rental", 
+                          "value": "5"
+                        }
+                      }, 
+                      "LineNum": i + 1
+                }
+              qboLines.push(monthly) 
+         }     
+    }
+    var subtotal = {
+        "DetailType": "SubTotalLineDetail", 
+        "Amount": doc.data.pricing.tables[0].summary.subtotal,
+        "SubTotalLineDetail": {}
+  }
+
+  //ship address
+    var addressBoth =doc.data.tokens[1]["Client.Address"]
+    var splitAddress = addressBoth.toString().split(',')
+   qboLines.push(subtotal)
+   // get signer 
+var recipients = doc.data.recipients
+var signerFound = false
+   for (var i = 0; i < recipients.length; i++) {
+      var l = recipients[i]    
+      if(l.recipient_type == "signer") {
+                signerFound = true
+                var recipientEmail = l.email
+                var recipientName = l.first_name + ' ' + l.last_name
+                var customerID = getCustomersFromQuickBooks(recipientEmail,recipientName)
+                if (customerID == -1) {
+                  i = 20000
+                  customerID = createCustomer( l.first_name ,l.last_name,recipientEmail)
+                }
+      }
+    }
+    var due = new Date(doc.data.tokens[2]["Contract.Date"])
+    dueDate = Utilities.formatDate(due,Session.getTimeZone(),'YYYY-MM-dd')
+   
+   var invoice = {
+    "Line" : qboLines,
+    "DueDate": dueDate,
+    "BillEmail": {
+      "Address": recipientEmail
+    },
+    "CustomField": [
+        {
+        "StringValue": doc.data.name, 
+        "Type": "StringType", 
+        "Name": "Project",
+        "DefinitionId" : "6"
+      }
+    ],
+    "CustomerRef": {
+        "name" : recipientName,
+        "value": customerID
+    },
+    "AllowOnlineCreditCardPayment": true,
+    "AllowOnlineACHPayment": true,
+    "BillAddr": {
+      "City": splitAddress[1], 
+      "Line1":  splitAddress[0],  
+      "PostalCode": splitAddress[2],  
+      "CountrySubDivisionCode":  splitAddress[3], 
+    },
+    "ShipAddr": {
+      "City": splitAddress[1], 
+      "Line1": splitAddress[0], 
+      "PostalCode": splitAddress[2],  
+      "CountrySubDivisionCode": splitAddress[3], 
+      "Id": "25"
+    }
+    }
+
+ var res =   createInvoice(invoice) 
+ 
+}
