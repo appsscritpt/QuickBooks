@@ -1,0 +1,30 @@
+function getItemsFromQuickBooks() {
+
+    var service = getService();
+
+    if (!service || !service.hasAccess()) {
+      Logger.log('Please authorize');
+      return;
+    }
+
+    var baseurl = 'https://quickbooks.api.intuit.com'
+    var sql = "select * from Item maxresults 1000"
+     //var sql = "Select * FROM Preferences"
+    var url = baseurl + '/v3/company/'+ QB_COMPANY_ID +'/query?query=' + sql +'&minorversion=65'
+   
+    var response = UrlFetchApp.fetch(url, {
+       muteHttpExceptions: true,
+      
+      headers: {
+        Authorization: 'Bearer ' + service.getAccessToken(),
+        'Accept' : 'application/json',
+        muteHttpExceptions: true
+      }
+    });
+    var result = JSON.parse(response.getContentText());
+    var items = result.QueryResponse.Item;
+    for (var i = 0; i < items.length; i++) {
+      var l = items[i];
+           Logger.log('%s - %s',l.Id,l.Name)
+    }
+  }
