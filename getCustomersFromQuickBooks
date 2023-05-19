@@ -1,0 +1,44 @@
+function getCustomersFromQuickBooks(email,name) {
+ 
+    var service = getService();
+
+    if (!service || !service.hasAccess()) {
+      Logger.log('Please authorize');
+      return;
+    }
+
+    var baseurl = 'https://quickbooks.api.intuit.com'
+    var sql = "select * from Customer maxresults 1000"
+    var url = baseurl + '/v3/company/'+ QB_COMPANY_ID +'/query?query=' + sql +'&minorversion=65'
+   
+    var response = UrlFetchApp.fetch(url, {
+       muteHttpExceptions: true,
+      // maxresults:1000,
+      headers: {
+        Authorization: 'Bearer ' + service.getAccessToken(),
+        'Accept' : 'application/json',
+        muteHttpExceptions: true
+      }
+    });
+    var result = JSON.parse(response.getContentText());
+     var customers = result.QueryResponse.Customer;
+    for (var i = 0; i < customers.length; i++) {
+      var l = customers[i]
+      var check = JSON.stringify(l).includes("PrimaryEmailAddr")
+      if(check) {
+        Logger.log("%s : %s - %s",i, l.DisplayName,l.PrimaryEmailAddr.Address)
+         if(l.PrimaryEmailAddr.Address == email) {
+           return l.Id
+         }
+      }
+      
+      if(l.DisplayName) {
+         if(l.DisplayName == name) {
+           return l.Id
+         }
+      }      
+        
+         // Logger.log('%s - %s - %s',l.Id,l.DisplayName)//, l.PrimaryEmailAddr.Address)
+    }
+    return -1
+  }
