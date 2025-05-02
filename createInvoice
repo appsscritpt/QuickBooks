@@ -1,0 +1,31 @@
+function createInvoice(invoice) {
+ var service = getService();
+  var myHeaders = {
+    "Accept": "application/json",
+    "Content-Type": "application/json",
+    "Authorization": "Bearer "  + service.getAccessToken() 
+  }
+  var requestOptions = {
+      method: 'POST',
+      headers: myHeaders,
+      payload: JSON.stringify(invoice),
+      redirect: 'follow',
+      muteHttpExceptions : true
+    }
+ try {
+    var service = getService();
+    if (service.hasAccess()) {
+          var baseurl = 'https://quickbooks.api.intuit.com'
+          var url = baseurl + '/v3/company/'+ QB_COMPANY_ID +'/invoice?minorversion=70&include=invoiceLink'
+          var response = UrlFetchApp.fetch(url,requestOptions)
+          var result = JSON.parse(response.getContentText())
+          return [result?.Invoice?.InvoiceLink, result?.Invoice?.Id]
+    } else {
+          var authorizationUrl = service.getAuthorizationUrl();
+          Logger.log('Open the following URL and re-run the script: %s', authorizationUrl)
+          return ['Error']
+    }
+  } catch(er) {
+     return ['Error']
+  }
+ }
