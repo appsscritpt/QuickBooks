@@ -1,0 +1,27 @@
+function sendInvoice(id,email) {
+  var service = getService();
+   var myHeaders = {
+        "Accept": "application/json",
+        'Content-type': 'application/octet-stream',
+        "Authorization": "Bearer "  + service.getAccessToken() 
+  }
+  var requestOptions = {
+      method: 'POST',
+      headers: myHeaders,
+      payload: JSON.stringify({}),
+      redirect: 'follow',
+      muteHttpExceptions : true
+    }
+  try {
+        var service = getService();
+        if (service.hasAccess()) {
+          var baseurl = 'https://quickbooks.api.intuit.com'
+          var url = baseurl + '/v3/company/'+ QB_COMPANY_ID +'/invoice/' + id +'/send?sendTo=' + email + '&minorversion=70'
+          var response = UrlFetchApp.fetch(url,requestOptions)
+          var result = JSON.parse(response.getContentText())
+        }   
+        }
+        catch(er) {
+          return 'Error'
+  }
+ }
